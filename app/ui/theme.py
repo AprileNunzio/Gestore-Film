@@ -39,10 +39,10 @@ class ThemeColors:
 
 
 LIGHT = ThemeColors(
-    sfondo="#F3F3F3",
+    sfondo="#E9E9EE",
     superficie="#FFFFFF",
-    superficie_alt="#F8F8FA",
-    bordo="#E1E1E6",
+    superficie_alt="#F3F3F7",
+    bordo="#DCDCE3",
     testo="#1A1A1E",
     testo_secondario="#5C5C66",
     accento="#5B5BD6",
@@ -57,10 +57,10 @@ LIGHT = ThemeColors(
 )
 
 DARK = ThemeColors(
-    sfondo="#1E1E22",
-    superficie="#2A2A2F",
-    superficie_alt="#232327",
-    bordo="#3A3A40",
+    sfondo="#17171A",
+    superficie="#26262B",
+    superficie_alt="#1F1F23",
+    bordo="#38383F",
     testo="#F2F2F5",
     testo_secondario="#B4B4BC",
     accento="#8B8BEE",

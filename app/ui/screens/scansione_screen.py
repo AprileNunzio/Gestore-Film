@@ -37,6 +37,7 @@ from PyQt6.QtWidgets import (
     QPlainTextEdit,
     QPushButton,
     QSizePolicy,
+    QStackedWidget,
     QTableView,
     QVBoxLayout,
     QWidget,
@@ -47,6 +48,7 @@ from app.ui import theme
 from app.organizers.universale import OrganizzatoreUniversale
 from app.services.job_queue import CodaLavori, EventoCoda, RisultatoJob
 from app.services.watchdog_service import SorveglianteDirectory
+from app.ui.effects import applica_ombra_carta
 from app.ui.screen_base import PollableScreen
 
 _log = logging.getLogger("gestore_film.principale")
@@ -495,9 +497,11 @@ class ScansioneView(PollableScreen):
         ):
             carta = QFrame()
             carta.setObjectName("cartaContenuto")
+            applica_ombra_carta(carta)
             carta.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             layout_carta = QVBoxLayout(carta)
-            layout_carta.setContentsMargins(14, 12, 14, 12)
+            layout_carta.setContentsMargins(16, 14, 16, 14)
+            layout_carta.setSpacing(6)
             etichetta_titolo = QLabel(titolo_kpi.upper())
             valore = QLabel("0")
             layout_carta.addWidget(etichetta_titolo)
@@ -511,7 +515,10 @@ class ScansioneView(PollableScreen):
 
         carta_distribuzione = QFrame()
         carta_distribuzione.setObjectName("cartaContenuto")
+        applica_ombra_carta(carta_distribuzione)
         layout_distribuzione = QVBoxLayout(carta_distribuzione)
+        layout_distribuzione.setContentsMargins(18, 16, 18, 16)
+        layout_distribuzione.setSpacing(8)
         layout_distribuzione.addWidget(QLabel("Distribuzione per tipo"))
         layout_distribuzione.addWidget(self._barra_distribuzione)
         layout_distribuzione.addWidget(self._legenda_distribuzione)
@@ -523,29 +530,45 @@ class ScansioneView(PollableScreen):
         self._tabella.verticalHeader().setVisible(False)
         self._tabella.setEditTriggers(QTableView.EditTrigger.NoEditTriggers)
         self._tabella.setSelectionBehavior(QTableView.SelectionBehavior.SelectRows)
+        self._tabella.setAlternatingRowColors(True)
+        applica_ombra_carta(self._tabella)
         controller.modello.rowsInserted.connect(lambda *_: self._tabella.scrollToBottom())
+        controller.modello.rowsInserted.connect(lambda *_: self._aggiorna_stato_vuoto())
+        controller.modello.modelReset.connect(self._aggiorna_stato_vuoto)
+
+        self._placeholder_coda = QLabel(
+            "Nessun file in coda.\nPremi «Avvia indicizzazione» per popolare questa vista."
+        )
+        self._placeholder_coda.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._placeholder_coda.setWordWrap(True)
+
+        self._stack_coda = QStackedWidget()
+        self._stack_coda.addWidget(self._tabella)
+        self._stack_coda.addWidget(self._placeholder_coda)
+        self._stack_coda.setCurrentWidget(self._placeholder_coda)
 
         etichetta_coda = QLabel("Coda elaborazione live")
         etichetta_coda.setStyleSheet("font-weight: 700;")
         colonna_centrale = QVBoxLayout()
         colonna_centrale.addWidget(etichetta_coda)
-        colonna_centrale.addWidget(self._tabella, stretch=1)
+        colonna_centrale.addWidget(self._stack_coda, stretch=1)
 
         etichetta_log = QLabel("Log sistema")
         etichetta_log.setStyleSheet("font-weight: 700;")
         self._log = QPlainTextEdit()
         self._log.setReadOnly(True)
         self._log.setMaximumBlockCount(300)
+        self._log.setPlaceholderText("I log della scansione appariranno qui...")
         self._log.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        applica_ombra_carta(self._log)
 
         colonna_destra = QVBoxLayout()
         colonna_destra.addWidget(etichetta_log)
         colonna_destra.addWidget(self._log, stretch=1)
 
-        contenuto_log = QFrame()
-        contenuto_log.setObjectName("cartaContenuto")
+        contenuto_log = QWidget()
         contenuto_log.setLayout(colonna_destra)
-        contenuto_log.setFixedWidth(280)
+        contenuto_log.setFixedWidth(300)
 
         riga_centrale = QHBoxLayout()
         riga_centrale.addLayout(colonna_centrale, stretch=1)
@@ -576,10 +599,15 @@ class ScansioneView(PollableScreen):
         for valore in self._etichette_kpi.values():
             valore.setStyleSheet(f"color: {c.testo}; font-size: 18pt; font-weight: 900;")
         self._legenda_distribuzione.setStyleSheet(f"color: {c.testo_secondario}; font-size: 9pt;")
+        self._placeholder_coda.setStyleSheet(f"color: {c.testo_secondario}; font-size: 10.5pt;")
         if self._controller.scansione_in_corso:
             self._pulsante_avvia.setStyleSheet(f"background-color: {c.errore};")
         else:
             self._pulsante_avvia.setStyleSheet(f"background-color: {c.successo};")
+
+    def _aggiorna_stato_vuoto(self) -> None:
+        vuota = self._controller.modello.rowCount() == 0
+        self._stack_coda.setCurrentWidget(self._placeholder_coda if vuota else self._tabella)
 
     def _al_avvio(self) -> None:
         self._pulsante_avvia.setText("INTERROMPI SCANSIONE")

@@ -24,6 +24,7 @@ from app.core.app_state import AppState
 from app.core.config import ConfigManager
 from app.core.recent_paths import RecentPathsStore
 from app.ui import theme
+from app.ui.effects import applica_ombra_carta
 from app.ui.widgets.directory_picker import SelettoreCartella
 
 
@@ -97,6 +98,7 @@ class PercorsiView(QWidget):
 
         carta = QFrame()
         carta.setObjectName("cartaContenuto")
+        applica_ombra_carta(carta)
         layout_carta = QVBoxLayout(carta)
         layout_carta.setContentsMargins(22, 22, 22, 22)
 
