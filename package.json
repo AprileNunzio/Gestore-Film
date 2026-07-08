@@ -1,0 +1,16 @@
+{
+  "name": "gestore-film-portable",
+  "version": "0.1.2",
+  "private": true,
+  "description": "Wrapper npm per orchestrare build/release di Gestore Film Portable. Il progetto e' Python/PyQt6: questi script npm richiamano solo PowerShell/PyInstaller/Inno Setup sotto il cofano, non c'e' codice Node ne' dipendenze da installare.",
+  "scripts": {
+    "version:bump": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/bump-version.ps1",
+    "build:local": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-local.ps1",
+    "build:publish": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-publish.ps1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AprileNunzio/Gestore-Film.git"
+  },
+  "license": "UNLICENSED"
+}

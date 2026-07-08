@@ -4,7 +4,7 @@ Riorganizzatore automatico di film, serie TV e musica in una libreria in stile J
 
 Migrazione di un'app precedente (`Script_Film`, Python + Flet) verso un'applicazione desktop Windows in **PyQt6**, distribuita sia come **build portable** (nessuna installazione, dati accanto all'eseguibile) sia come **installer** (per chi preferisce un'installazione tradizionale).
 
-> **Stato attuale: walking skeleton.** Sono complete le schermate **Percorsi** e **Scansione**, l'intero layer di business logic (`servizi`/`organizzatori` di `Script_Film` portati con type hints e alcuni bug corretti), il redesign UI (tema chiaro/scuro, finestra sempre massimizzata, layout responsive) e la catena di packaging (PyInstaller + installer). Le altre schermate (Approvazione, Code, Pulizia Archivio, Automazione, Impostazioni, Trickplay) sono voci di navigazione disabilitate, in attesa di essere portate una alla volta.
+> **Stato attuale: walking skeleton.** Sono complete le schermate **Percorsi**, **Scansione** e **Impostazioni**, l'intero layer di business logic (`servizi`/`organizzatori` di `Script_Film` portati con type hints e alcuni bug corretti), il redesign UI (tema chiaro/scuro, finestra sempre massimizzata, layout responsive) e la catena di packaging (PyInstaller + installer + wrapper npm per bump versione automatico). Le altre schermate (Approvazione, Code, Pulizia Archivio, Automazione, Trickplay) sono voci di navigazione disabilitate, in attesa di essere portate una alla volta.
 
 ## Installazione
 
@@ -18,6 +18,7 @@ Scarica l'ultima release da **[Releases](https://github.com/AprileNunzio/Gestore
 - Windows 10/11
 - Python 3.12 (solo per lo sviluppo — l'utente finale non deve installare nulla)
 - I binari `ffmpeg.exe`/`ffprobe.exe` (ffmpeg "essentials" build per Windows) copiati in `ffmpeg/bin/` — **non versionati in git** perché superano le dimensioni consigliate per un repository (~100 MB l'uno). Scaricali da [gyan.dev/ffmpeg/builds](https://www.gyan.dev/ffmpeg/builds/) (build "essentials", licenza LGPL) e copia `ffmpeg.exe`/`ffprobe.exe` in `ffmpeg/bin/`.
+- Per compilare (facoltativo se lavori solo sul codice): [Node.js](https://nodejs.org/) (solo come runner comodo per gli script di build, **il progetto non ha nessuna dipendenza Node/npm**), [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup`) per l'installer, `gh` CLI autenticato per pubblicare release.
 
 ## Sviluppo
 
@@ -31,21 +32,25 @@ Le chiavi API (TMDB, Gemini, OpenAI, AcoustID) vanno in un file `.env` nella roo
 
 ## Build
 
+Il progetto è Python puro — `package.json` esiste solo come **wrapper comodo** attorno agli script PowerShell in `scripts/` (nessuna dipendenza da installare, `npm install` non serve):
+
 ```powershell
-# Build portable (PyInstaller --onedir)
-.venv\Scripts\python -m PyInstaller --distpath build\dist --workpath build\work --noconfirm build\gestore_film.spec
+npm run build:local     # bump patch di VERSION, build PyInstaller, installer, zip portable — solo in locale
+npm run build:publish   # come sopra + commit del bump, tag git, push, release GitHub con gli artefatti allegati
+npm run version:bump    # solo il bump di versione (usa -- --Parte minor|major per non incrementare la patch)
 ```
 
-Produce `build/dist/GestoreFilmPortable/` — cartella autosufficiente (`--onedir`, layout flat senza `_internal/`) pronta per essere copiata/zippata e distribuita. Tutti i dati (config, cache, log, database) vengono creati accanto a `GestoreFilmPortable.exe`, mai nella cartella da cui viene lanciato.
+`build:local` produce `build/dist/GestoreFilmPortable/` (cartella autosufficiente, `--onedir`, layout flat senza `_internal/`) e `build/installer_output/` (installer `.exe` + zip portable). Tutti i dati dell'app (config, cache, log, database) vengono creati accanto a `GestoreFilmPortable.exe`, mai nella cartella da cui viene lanciato. `build:publish` richiede una working tree pulita e `gh` già autenticato — **push e release sono operazioni pubbliche**, eseguilo solo quando vuoi davvero pubblicare.
 
-Per generare anche l'installer, serve [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup`):
+Equivalente manuale, senza npm/PowerShell:
 
 ```powershell
+.venv\Scripts\python -m PyInstaller --distpath build\dist --workpath build\work --noconfirm build\gestore_film.spec
 $version = (Get-Content VERSION).Trim()
 & "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" build\installer.iss
 ```
 
-Produce `build/installer_output/GestoreFilmPortable-Setup-X.Y.Z.exe`. Lo script (`build/installer.iss`) impacchetta la stessa cartella `build/dist/GestoreFilmPortable/` prodotta da PyInstaller — non serve nessuna build separata né logica applicativa diversa tra le due distribuzioni: installare equivale semplicemente a copiare la build portable in `%APPDATA%\NunzioTech\Gestore_Film` e aggiungere collegamenti/disinstallazione.
+Lo script installer (`build/installer.iss`) impacchetta la stessa cartella `build/dist/GestoreFilmPortable/` prodotta da PyInstaller — non serve nessuna build separata né logica applicativa diversa tra le due distribuzioni: installare equivale semplicemente a copiare la build portable in `%APPDATA%\NunzioTech\Gestore_Film` e aggiungere collegamenti/disinstallazione.
 
 ## Architettura
 
@@ -57,7 +62,8 @@ app/
   ui/           # finestra principale, tema chiaro/scuro (theme.py), schermate PyQt6, widget riusabili
 ffmpeg/bin/     # ffmpeg.exe/ffprobe.exe (da scaricare separatamente, vedi sopra)
 build/          # spec PyInstaller + script installer Inno Setup
-VERSION         # numero di versione, fonte di verità per build/gestore_film.spec e build/installer.iss
+scripts/        # script PowerShell richiamati dagli npm script (bump versione, build, publish)
+VERSION         # numero di versione, fonte di verità (rispecchiato in package.json ad ogni bump)
 ```
 
 Principi seguiti nella migrazione (vedi commenti nei singoli moduli per i dettagli):
@@ -67,8 +73,9 @@ Principi seguiti nella migrazione (vedi commenti nei singoli moduli per i dettag
 
 ## Roadmap
 
-- [ ] Portare le schermate rimanenti (Approvazione, Code, Pulizia Archivio, Automazione, Impostazioni, Trickplay)
+- [ ] Portare le schermate rimanenti (Approvazione, Code, Pulizia Archivio, Automazione, Trickplay)
 - [x] Redesign completo della UI (fullscreen, responsive, light/dark)
 - [ ] Auto-update automatico da GitHub Releases
 - [x] Installer (distribuzione parallela alla build portable)
-- [ ] Bump automatico di versione e pubblicazione release via CI ad ogni build
+- [x] Bump automatico di versione (locale e in pubblicazione) via `npm run build:local`/`build:publish`
+- [ ] Workflow GitHub Actions per build+release automatiche ad ogni push

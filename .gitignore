@@ -22,6 +22,9 @@ build/installer_output/
 # Binari vendored troppo grandi per git (~100MB l'uno): vedi README per come ottenerli
 ffmpeg/bin/*.exe
 
+# npm (wrapper senza dipendenze, ma per sicurezza se mai ne venissero aggiunte)
+node_modules/
+
 # Editor / OS
 .vscode/
 .idea/
