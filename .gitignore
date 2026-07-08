@@ -1,0 +1,28 @@
+# Ambiente Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Dati generati a runtime (mai versionati: portable per definizione)
+settings.json
+dati_recenti.json
+cache_elite.db
+file_registry.db
+logs/
+error_log.txt
+.env
+
+# Build
+build/dist/
+build/work/
+*.spec.bak
+
+# Binari vendored troppo grandi per git (~100MB l'uno): vedi README per come ottenerli
+ffmpeg/bin/*.exe
+
+# Editor / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

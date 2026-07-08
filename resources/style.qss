@@ -1,0 +1,123 @@
+/* Palette portata da app.core.config (COLORE_*) - tenere sincronizzati i valori. */
+
+QWidget {
+    background-color: #F4F2F8;
+    color: #1C1B1F;
+    font-family: "Segoe UI";
+    font-size: 10.5pt;
+}
+
+QMainWindow {
+    background-color: #F4F2F8;
+}
+
+#barraNavigazione {
+    background-color: #FFFFFF;
+    border: none;
+    border-right: 1px solid #D0CCE0;
+    outline: 0;
+    padding-top: 8px;
+}
+
+#barraNavigazione::item {
+    padding: 12px 16px;
+    color: #49454F;
+    border-left: 3px solid transparent;
+}
+
+#barraNavigazione::item:selected {
+    background-color: #F4F2F8;
+    color: #5B35A8;
+    border-left: 3px solid #5B35A8;
+    font-weight: 600;
+}
+
+#barraNavigazione::item:disabled {
+    color: #B7B2C4;
+}
+
+#barraNavigazione::item:hover:!selected {
+    background-color: #F4F2F8;
+}
+
+QPushButton {
+    background-color: #5B35A8;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 16px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #7C5CBF;
+}
+
+QPushButton:disabled {
+    background-color: #D0CCE0;
+    color: #FFFFFF;
+}
+
+QPushButton#pulsanteSecondario {
+    background-color: #FFFFFF;
+    color: #5B35A8;
+    border: 1px solid #5B35A8;
+}
+
+QPushButton#pulsanteSecondario:hover {
+    background-color: #F4F2F8;
+}
+
+QLineEdit, QTextEdit, QComboBox {
+    background-color: #FFFFFF;
+    border: 1px solid #D0CCE0;
+    border-radius: 6px;
+    padding: 6px 8px;
+}
+
+QLineEdit:focus, QComboBox:focus {
+    border: 1px solid #5B35A8;
+}
+
+QLabel#titoloSchermata {
+    font-size: 16pt;
+    font-weight: 700;
+    color: #1C1B1F;
+}
+
+QLabel#sottotitoloSchermata {
+    color: #49454F;
+}
+
+QFrame#cartaContenuto {
+    background-color: #FFFFFF;
+    border: 1px solid #D0CCE0;
+    border-radius: 10px;
+}
+
+QProgressBar {
+    background-color: #F4F2F8;
+    border: 1px solid #D0CCE0;
+    border-radius: 6px;
+    text-align: center;
+}
+
+QProgressBar::chunk {
+    background-color: #5B35A8;
+    border-radius: 6px;
+}
+
+QTableView, QListView {
+    background-color: #FFFFFF;
+    border: 1px solid #D0CCE0;
+    border-radius: 6px;
+    gridline-color: #D0CCE0;
+}
+
+QHeaderView::section {
+    background-color: #F4F2F8;
+    color: #49454F;
+    padding: 6px;
+    border: none;
+    border-bottom: 1px solid #D0CCE0;
+}
