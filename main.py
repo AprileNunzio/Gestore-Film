@@ -54,16 +54,14 @@ def main() -> int:
     from PyQt6.QtWidgets import QApplication
 
     from app.services.job_queue import crea_code
+    from app.ui import theme
     from app.ui.main_window import MainWindow, VoceNavigazione
     from app.ui.screens.percorsi_screen import crea_schermata_percorsi
     from app.ui.screens.scansione_screen import crea_schermata_scansione
 
     app = QApplication(sys.argv)
     app.setApplicationName("Gestore Film Portable")
-
-    foglio_stile = paths.resources_dir / "style.qss"
-    if foglio_stile.exists():
-        app.setStyleSheet(foglio_stile.read_text(encoding="utf-8"))
+    theme.applica_tema(app, theme.rileva_tema_sistema())
 
     config_manager = ConfigManager(paths)
     config = config_manager.carica()
@@ -82,14 +80,14 @@ def main() -> int:
     schermata_scansione = crea_schermata_scansione(stato, coda_analisi, coda_io)
 
     voci = [
-        VoceNavigazione("Percorsi", schermata_percorsi),
-        VoceNavigazione("Scansione", schermata_scansione),
-        VoceNavigazione("Approvazione", None, abilitata=False),
-        VoceNavigazione("Code", None, abilitata=False),
-        VoceNavigazione("Pulizia Archivio", None, abilitata=False),
-        VoceNavigazione("Automazione", None, abilitata=False),
-        VoceNavigazione("Impostazioni", None, abilitata=False),
-        VoceNavigazione("Trickplay", None, abilitata=False),
+        VoceNavigazione("Percorsi", schermata_percorsi, icona="📁"),
+        VoceNavigazione("Scansione", schermata_scansione, icona="🔍"),
+        VoceNavigazione("Approvazione", None, icona="✅", abilitata=False),
+        VoceNavigazione("Code", None, icona="📋", abilitata=False),
+        VoceNavigazione("Pulizia Archivio", None, icona="🗂️", abilitata=False),
+        VoceNavigazione("Automazione", None, icona="⚡", abilitata=False),
+        VoceNavigazione("Impostazioni", None, icona="⚙️", abilitata=False),
+        VoceNavigazione("Trickplay", None, icona="🎞️", abilitata=False),
     ]
 
     def _puo_chiudere() -> tuple[bool, str]:
@@ -106,7 +104,7 @@ def main() -> int:
 
     schermata_percorsi.controller.richiesta_avvio_scansione.connect(_al_avvio_scansione_richiesto)
 
-    finestra.show()
+    finestra.showMaximized()
     return app.exec()
 
 

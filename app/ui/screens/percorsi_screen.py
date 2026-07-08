@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import QFrame, QLabel, QListWidget, QListWidgetItem, QPushB
 from app.core.app_state import AppState
 from app.core.config import ConfigManager
 from app.core.recent_paths import RecentPathsStore
+from app.ui import theme
 from app.ui.widgets.directory_picker import SelettoreCartella
 
 
@@ -83,6 +84,7 @@ class PercorsiView(QWidget):
         super().__init__(parent)
         self._controller = controller
         controller.avviso.connect(self._mostra_avviso)
+        theme.bus.cambiato.connect(lambda _: (self._aggiorna_badge(), self._ridisegna_etichette()))
 
         titolo = QLabel("Seleziona Sorgente")
         titolo.setObjectName("titoloSchermata")
@@ -98,21 +100,19 @@ class PercorsiView(QWidget):
         layout_carta = QVBoxLayout(carta)
         layout_carta.setContentsMargins(22, 22, 22, 22)
 
-        etichetta_sorgente = QLabel("Cartella sorgente (locale o ftp://)")
-        etichetta_sorgente.setStyleSheet("font-weight: 600; color: #49454F;")
+        self._etichetta_sorgente = QLabel("Cartella sorgente (locale o ftp://)")
         self._selettore = SelettoreCartella()
         self._selettore.imposta_percorso(controller.stato.sorgente)
 
-        etichetta_recenti = QLabel("Recenti")
-        etichetta_recenti.setStyleSheet("color: #5B35A8; font-size: 9pt;")
+        self._etichetta_recenti = QLabel("Recenti")
         self._lista_recenti = QListWidget()
-        self._lista_recenti.setMaximumHeight(120)
+        self._lista_recenti.setMaximumHeight(140)
         self._lista_recenti.itemClicked.connect(self._al_click_recente)
 
-        layout_carta.addWidget(etichetta_sorgente)
+        layout_carta.addWidget(self._etichetta_sorgente)
         layout_carta.addWidget(self._selettore)
         layout_carta.addSpacing(10)
-        layout_carta.addWidget(etichetta_recenti)
+        layout_carta.addWidget(self._etichetta_recenti)
         layout_carta.addWidget(self._lista_recenti)
 
         self._avviso_label = QLabel()
@@ -137,6 +137,7 @@ class PercorsiView(QWidget):
 
         self._aggiorna_badge()
         self._aggiorna_recenti()
+        self._ridisegna_etichette()
 
     @property
     def controller(self) -> PercorsiController:
@@ -147,17 +148,25 @@ class PercorsiView(QWidget):
         self._aggiorna_badge()
         self._aggiorna_recenti()
 
+    def _ridisegna_etichette(self) -> None:
+        c = theme.colori_correnti()
+        self._etichetta_sorgente.setStyleSheet(f"font-weight: 600; color: {c.testo_secondario};")
+        self._etichetta_recenti.setStyleSheet(f"color: {c.accento}; font-size: 9pt;")
+
     def _aggiorna_badge(self) -> None:
+        c = theme.colori_correnti()
         configurate = self._controller.destinazioni_configurate()
         if configurate:
             self._badge.setText("✓ Destinazioni configurate")
             self._badge.setStyleSheet(
-                "background-color: #F0FAF4; color: #1B7A4E; border: 1px solid #A7D7B5; border-radius: 10px;"
+                f"background-color: {c.successo_sfondo}; color: {c.successo}; "
+                f"border: 1px solid {c.successo}; border-radius: 10px;"
             )
         else:
             self._badge.setText("⚠ Destinazioni non ancora configurate")
             self._badge.setStyleSheet(
-                "background-color: #FFF8EC; color: #B45309; border: 1px solid #F6D860; border-radius: 10px;"
+                f"background-color: {c.avviso_sfondo}; color: {c.avviso}; "
+                f"border: 1px solid {c.avviso}; border-radius: 10px;"
             )
 
     def _aggiorna_recenti(self) -> None:
@@ -175,7 +184,8 @@ class PercorsiView(QWidget):
         self._controller.avvia(self._selettore.percorso())
 
     def _mostra_avviso(self, messaggio: str, e_errore: bool) -> None:
-        colore = "#B91C1C" if e_errore else "#1B7A4E"
+        c = theme.colori_correnti()
+        colore = c.errore if e_errore else c.successo
         self._avviso_label.setStyleSheet(f"color: {colore}; font-weight: 600;")
         self._avviso_label.setText(messaggio)
         self._avviso_label.setVisible(True)

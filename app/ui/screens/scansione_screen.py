@@ -43,6 +43,7 @@ from PyQt6.QtWidgets import (
 )
 
 from app.core.app_state import AppState
+from app.ui import theme
 from app.organizers.universale import OrganizzatoreUniversale
 from app.services.job_queue import CodaLavori, EventoCoda, RisultatoJob
 from app.services.watchdog_service import SorveglianteDirectory
@@ -50,8 +51,10 @@ from app.ui.screen_base import PollableScreen
 
 _log = logging.getLogger("gestore_film.principale")
 
-_COLORE_PRIMARIO = "#5B35A8"
-_COLORE_TESTO = "#1C1B1F"
+# Colori categorici della barra di distribuzione film/serie/musica: restano fissi
+# tra i due temi (non sono colori semantici di stato, servono solo a distinguere
+# visivamente le categorie in modo stabile).
+_MAPPA_COLORI_CANALE = {"film": "#7C5CBF", "serie": "#5B35A8", "musica": "#12A484", "misto": "#8A8A94"}
 
 
 def _analizza_job(organizzatore: OrganizzatoreUniversale, info: dict[str, Any], usa_ai: bool) -> dict[str, Any]:
@@ -449,14 +452,13 @@ class _BarraDistribuzione(QWidget):
 
 
 class ScansioneView(PollableScreen):
-    _MAPPA_COLORI_CANALE = {"film": "#7C5CBF", "serie": _COLORE_PRIMARIO, "musica": "#10a37f", "misto": "#7A747E"}
-
     def __init__(self, controller: ScansioneController, parent: Optional[QWidget] = None) -> None:
         super().__init__(intervallo_ms=500, parent=parent)
         self._controller = controller
         controller.log_emesso.connect(self._aggiungi_log)
         controller.scansione_avviata.connect(self._al_avvio)
         controller.scansione_fermata.connect(self._al_arresto)
+        theme.bus.cambiato.connect(lambda _: self._ridisegna_colori())
 
         titolo = QLabel("Scansione")
         titolo.setObjectName("titoloSchermata")
@@ -476,7 +478,10 @@ class ScansioneView(PollableScreen):
         intestazione.addWidget(self._pulsante_avvia)
 
         self._etichette_kpi: dict[str, QLabel] = {}
+        self._etichette_kpi_titolo: list[QLabel] = []
         griglia_kpi = QGridLayout()
+        griglia_kpi.setSpacing(12)
+        colonne_griglia = 4
         for i, (chiave, titolo_kpi) in enumerate(
             [
                 ("indicizzati", "Indicizzati"),
@@ -490,20 +495,19 @@ class ScansioneView(PollableScreen):
         ):
             carta = QFrame()
             carta.setObjectName("cartaContenuto")
+            carta.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
             layout_carta = QVBoxLayout(carta)
-            layout_carta.setContentsMargins(12, 10, 12, 10)
+            layout_carta.setContentsMargins(14, 12, 14, 12)
             etichetta_titolo = QLabel(titolo_kpi.upper())
-            etichetta_titolo.setStyleSheet("color: #7A747E; font-size: 8pt; font-weight: 600;")
             valore = QLabel("0")
-            valore.setStyleSheet(f"color: {_COLORE_TESTO}; font-size: 16pt; font-weight: 900;")
             layout_carta.addWidget(etichetta_titolo)
             layout_carta.addWidget(valore)
             self._etichette_kpi[chiave] = valore
-            griglia_kpi.addWidget(carta, 0, i)
+            self._etichette_kpi_titolo.append(etichetta_titolo)
+            griglia_kpi.addWidget(carta, i // colonne_griglia, i % colonne_griglia)
 
         self._barra_distribuzione = _BarraDistribuzione()
         self._legenda_distribuzione = QLabel()
-        self._legenda_distribuzione.setStyleSheet("color: #7A747E; font-size: 9pt;")
 
         carta_distribuzione = QFrame()
         carta_distribuzione.setObjectName("cartaContenuto")
@@ -555,6 +559,7 @@ class ScansioneView(PollableScreen):
         layout.addLayout(riga_centrale, stretch=1)
 
         self._aggiorna_kpi()
+        self._ridisegna_colori()
 
     @property
     def controller(self) -> ScansioneController:
@@ -564,13 +569,25 @@ class ScansioneView(PollableScreen):
         ts = time.strftime("%H:%M:%S")
         self._log.appendPlainText(f"[{ts}] {messaggio}")
 
+    def _ridisegna_colori(self) -> None:
+        c = theme.colori_correnti()
+        for etichetta in self._etichette_kpi_titolo:
+            etichetta.setStyleSheet(f"color: {c.testo_secondario}; font-size: 8pt; font-weight: 600;")
+        for valore in self._etichette_kpi.values():
+            valore.setStyleSheet(f"color: {c.testo}; font-size: 18pt; font-weight: 900;")
+        self._legenda_distribuzione.setStyleSheet(f"color: {c.testo_secondario}; font-size: 9pt;")
+        if self._controller.scansione_in_corso:
+            self._pulsante_avvia.setStyleSheet(f"background-color: {c.errore};")
+        else:
+            self._pulsante_avvia.setStyleSheet(f"background-color: {c.successo};")
+
     def _al_avvio(self) -> None:
         self._pulsante_avvia.setText("INTERROMPI SCANSIONE")
-        self._pulsante_avvia.setStyleSheet("background-color: #B91C1C;")
+        self._ridisegna_colori()
 
     def _al_arresto(self) -> None:
         self._pulsante_avvia.setText("AVVIA INDICIZZAZIONE")
-        self._pulsante_avvia.setStyleSheet("background-color: #1B7A4E;")
+        self._ridisegna_colori()
 
     def _al_tick(self) -> None:
         self._aggiorna_kpi()
@@ -597,13 +614,13 @@ class ScansioneView(PollableScreen):
         totale = sum(conteggio.values())
 
         if totale > 0:
-            segmenti = [(qta, QColor(self._MAPPA_COLORI_CANALE[tipo])) for tipo, qta in conteggio.items() if qta > 0]
+            segmenti = [(qta, QColor(_MAPPA_COLORI_CANALE[tipo])) for tipo, qta in conteggio.items() if qta > 0]
             self._barra_distribuzione.imposta_dati(segmenti)
             self._legenda_distribuzione.setText(
                 "  ·  ".join(f"{tipo.upper()}: {qta} ({int(qta / totale * 100)}%)" for tipo, qta in conteggio.items() if qta > 0)
             )
         else:
-            self._barra_distribuzione.imposta_dati([(1, QColor("#EEEEEE"))])
+            self._barra_distribuzione.imposta_dati([(1, QColor(theme.colori_correnti().bordo))])
             self._legenda_distribuzione.setText("In attesa di scansione...")
 
 
