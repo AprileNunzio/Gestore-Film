@@ -4,7 +4,14 @@ Riorganizzatore automatico di film, serie TV e musica in una libreria in stile J
 
 Migrazione di un'app precedente (`Script_Film`, Python + Flet) verso un'applicazione desktop Windows in **PyQt6**, distribuita sia come **build portable** (nessuna installazione, dati accanto all'eseguibile) sia come **installer** (per chi preferisce un'installazione tradizionale).
 
-> **Stato attuale: walking skeleton.** Sono complete le schermate **Percorsi** e **Scansione**, l'intero layer di business logic (`servizi`/`organizzatori` di `Script_Film` portati con type hints e alcuni bug corretti) e la catena di packaging PyInstaller. Le altre schermate (Approvazione, Code, Pulizia Archivio, Automazione, Impostazioni, Trickplay) sono voci di navigazione disabilitate, in attesa di essere portate una alla volta.
+> **Stato attuale: walking skeleton.** Sono complete le schermate **Percorsi** e **Scansione**, l'intero layer di business logic (`servizi`/`organizzatori` di `Script_Film` portati con type hints e alcuni bug corretti), il redesign UI (tema chiaro/scuro, finestra sempre massimizzata, layout responsive) e la catena di packaging (PyInstaller + installer). Le altre schermate (Approvazione, Code, Pulizia Archivio, Automazione, Impostazioni, Trickplay) sono voci di navigazione disabilitate, in attesa di essere portate una alla volta.
+
+## Installazione
+
+Scarica l'ultima release da **[Releases](https://github.com/AprileNunzio/Gestore-Film/releases/latest)**. Sono disponibili due varianti, stessa build:
+
+- **Installer** (`GestoreFilmPortable-Setup-X.Y.Z.exe`): installa in `%APPDATA%\NunzioTech\Gestore_Film`, nessun privilegio amministratore richiesto, crea collegamenti Start Menu/Desktop e un disinstallatore.
+- **Portable** (`GestoreFilmPortable-Portable-X.Y.Z.zip`): scompatta ed esegui `GestoreFilmPortable.exe`, nessuna installazione, tutti i dati restano accanto all'eseguibile — puoi spostare la cartella o portarla su una chiavetta USB.
 
 ## Requisiti
 
@@ -25,10 +32,20 @@ Le chiavi API (TMDB, Gemini, OpenAI, AcoustID) vanno in un file `.env` nella roo
 ## Build
 
 ```powershell
+# Build portable (PyInstaller --onedir)
 .venv\Scripts\python -m PyInstaller --distpath build\dist --workpath build\work --noconfirm build\gestore_film.spec
 ```
 
-Produce `build/dist/GestoreFilmPortable/` — cartella autosufficiente (`--onedir`, layout flat senza `_internal/`) pronta per essere copiata/zippata e distribuita. Tutti i dati (config, cache, log, database) vengono creati accanto a `GestoreFilmPortable.exe`, mai nella cartella da cui viene lanciato né in `AppData`.
+Produce `build/dist/GestoreFilmPortable/` — cartella autosufficiente (`--onedir`, layout flat senza `_internal/`) pronta per essere copiata/zippata e distribuita. Tutti i dati (config, cache, log, database) vengono creati accanto a `GestoreFilmPortable.exe`, mai nella cartella da cui viene lanciato.
+
+Per generare anche l'installer, serve [Inno Setup 6](https://jrsoftware.org/isinfo.php) (`winget install JRSoftware.InnoSetup`):
+
+```powershell
+$version = (Get-Content VERSION).Trim()
+& "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$version" build\installer.iss
+```
+
+Produce `build/installer_output/GestoreFilmPortable-Setup-X.Y.Z.exe`. Lo script (`build/installer.iss`) impacchetta la stessa cartella `build/dist/GestoreFilmPortable/` prodotta da PyInstaller — non serve nessuna build separata né logica applicativa diversa tra le due distribuzioni: installare equivale semplicemente a copiare la build portable in `%APPDATA%\NunzioTech\Gestore_Film` e aggiungere collegamenti/disinstallazione.
 
 ## Architettura
 
@@ -37,10 +54,10 @@ app/
   core/        # path portable, config, logging + dialog d'errore, stato condiviso
   services/     # integrazioni esterne (TMDB, Gemini, OpenAI, MusicBrainz, AcoustID, ffmpeg, watchdog, FTP) + motore job Qt
   organizers/   # logica di business per film/serie/musica + orchestratore universale
-  ui/           # finestra principale, schermate PyQt6, widget riusabili
-resources/      # foglio di stile QSS
+  ui/           # finestra principale, tema chiaro/scuro (theme.py), schermate PyQt6, widget riusabili
 ffmpeg/bin/     # ffmpeg.exe/ffprobe.exe (da scaricare separatamente, vedi sopra)
-build/          # spec PyInstaller
+build/          # spec PyInstaller + script installer Inno Setup
+VERSION         # numero di versione, fonte di verità per build/gestore_film.spec e build/installer.iss
 ```
 
 Principi seguiti nella migrazione (vedi commenti nei singoli moduli per i dettagli):
@@ -51,6 +68,7 @@ Principi seguiti nella migrazione (vedi commenti nei singoli moduli per i dettag
 ## Roadmap
 
 - [ ] Portare le schermate rimanenti (Approvazione, Code, Pulizia Archivio, Automazione, Impostazioni, Trickplay)
-- [ ] Redesign completo della UI (fullscreen, responsive, light/dark)
+- [x] Redesign completo della UI (fullscreen, responsive, light/dark)
 - [ ] Auto-update automatico da GitHub Releases
-- [ ] Installer opzionale (distribuzione parallela alla build portable)
+- [x] Installer (distribuzione parallela alla build portable)
+- [ ] Bump automatico di versione e pubblicazione release via CI ad ogni build
