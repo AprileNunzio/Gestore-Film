@@ -19,3 +19,4 @@ class AppState:
     approvazione_manuale: dict[str, Any] = field(default_factory=dict)
     scan_da_avviare: bool = False
     risultati: list[dict[str, Any]] = field(default_factory=list)
+    redirect_post_config: bool = False

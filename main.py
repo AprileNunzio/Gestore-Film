@@ -56,6 +56,7 @@ def main() -> int:
     from app.services.job_queue import crea_code
     from app.ui import theme
     from app.ui.main_window import MainWindow, VoceNavigazione
+    from app.ui.screens.impostazioni_screen import crea_schermata_impostazioni
     from app.ui.screens.percorsi_screen import crea_schermata_percorsi
     from app.ui.screens.scansione_screen import crea_schermata_scansione
 
@@ -78,6 +79,7 @@ def main() -> int:
 
     schermata_percorsi = crea_schermata_percorsi(stato, config_manager, recenti)
     schermata_scansione = crea_schermata_scansione(stato, coda_analisi, coda_io)
+    schermata_impostazioni = crea_schermata_impostazioni(stato, config_manager)
 
     voci = [
         VoceNavigazione("Percorsi", schermata_percorsi, icona="📁"),
@@ -86,9 +88,10 @@ def main() -> int:
         VoceNavigazione("Code", None, icona="📋", abilitata=False),
         VoceNavigazione("Pulizia Archivio", None, icona="🗂️", abilitata=False),
         VoceNavigazione("Automazione", None, icona="⚡", abilitata=False),
-        VoceNavigazione("Impostazioni", None, icona="⚙️", abilitata=False),
+        VoceNavigazione("Impostazioni", schermata_impostazioni, icona="⚙️"),
         VoceNavigazione("Trickplay", None, icona="🎞️", abilitata=False),
     ]
+    indice_impostazioni = 6
 
     def _puo_chiudere() -> tuple[bool, str]:
         attive = coda_analisi.operazioni_attive + coda_io.operazioni_attive
@@ -102,7 +105,12 @@ def main() -> int:
         finestra.vai_a_indice(1)
         schermata_scansione.controller.avvia_scansione()
 
+    def _alla_richiesta_configurazione() -> None:
+        finestra.vai_a_indice(indice_impostazioni)
+
     schermata_percorsi.controller.richiesta_avvio_scansione.connect(_al_avvio_scansione_richiesto)
+    schermata_percorsi.controller.richiesta_configurazione.connect(_alla_richiesta_configurazione)
+    schermata_impostazioni.controller.richiesta_ritorno_scansione.connect(_al_avvio_scansione_richiesto)
 
     finestra.showMaximized()
     return app.exec()

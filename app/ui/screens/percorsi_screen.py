@@ -8,10 +8,8 @@ Fix rispetto all'originale: quando le destinazioni non sono configurate,
 Script_Film navigava a vai_a(4) ("Pulizia Archivio" nel router di main.py)
 invece che alla schermata "Impostazioni" (indice 6), l'unica che leggeva
 davvero redirect_post_config — un mismatch di navigazione confermato durante
-l'analisi. Qui, dato che "Impostazioni" non è ancora stata portata in questa
-milestone, si mostra un avviso inline invece di un redirect verso una
-schermata inesistente; il collegamento verrà ripristinato quando
-Impostazioni sarà portata in una sessione successiva.
+l'analisi. Qui il redirect punta correttamente a Impostazioni (vedi
+richiesta_configurazione, collegata in main.py).
 """
 from __future__ import annotations
 
@@ -30,6 +28,7 @@ from app.ui.widgets.directory_picker import SelettoreCartella
 
 class PercorsiController(QObject):
     richiesta_avvio_scansione = pyqtSignal()
+    richiesta_configurazione = pyqtSignal()
     avviso = pyqtSignal(str, bool)  # (messaggio, e_errore)
 
     def __init__(self, stato: AppState, config_manager: ConfigManager, recenti: RecentPathsStore) -> None:
@@ -62,11 +61,8 @@ class PercorsiController(QObject):
         self._stato.sorgente = sorgente
 
         if not self.destinazioni_configurate():
-            self.avviso.emit(
-                "Le destinazioni (film/serie/musica) non sono ancora configurate. "
-                "Verranno configurabili dalla schermata Impostazioni, non ancora disponibile in questa versione.",
-                True,
-            )
+            self._stato.redirect_post_config = True
+            self.richiesta_configurazione.emit()
             return
 
         config = self._config.carica()
