@@ -16,6 +16,7 @@ error_log.txt
 # Build
 build/dist/
 build/work/
+build/installer_output/
 *.spec.bak
 
 # Binari vendored troppo grandi per git (~100MB l'uno): vedi README per come ottenerli
