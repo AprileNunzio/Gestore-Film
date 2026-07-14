@@ -68,3 +68,28 @@ class TransferBridge(QObject):
 
     progresso_io = pyqtSignal(dict, dict)
     conflitto_richiesto = pyqtSignal(dict, dict)
+
+    def __init__(self, parent: Optional[QObject] = None) -> None:
+        super().__init__(parent)
+        self.progresso_io.connect(self._invia_a_task_manager)
+        
+    def _invia_a_task_manager(self, info_file: dict, progresso: dict) -> None:
+        nome = info_file.get("nome", info_file.get("file_originale", ""))
+        if not nome:
+            return
+            
+        from app.core.task_manager import TaskManager, TaskState, TaskType
+        tm = TaskManager.get_instance()
+        
+        # Cerca un task I/O attivo o in pausa associato a questo file
+        for task in tm.get_all_tasks():
+            if task.type == TaskType.IO_DISK and task.name == nome and task.state in (TaskState.RUNNING, TaskState.PAUSED, TaskState.PENDING):
+                task.total_bytes = progresso.get("totale", 0)
+                task.update_metrics(progresso.get("copiati", 0))
+                task.progress_macro = progresso.get("percentuale", 0.0) * 100.0
+                if "velocita" in progresso:
+                    task.speed_bytes_per_sec = progresso["velocita"]
+                if "etr" in progresso:
+                    task.eta_seconds = progresso["etr"]
+                tm.signals.task_updated.emit(task.id)
+                break

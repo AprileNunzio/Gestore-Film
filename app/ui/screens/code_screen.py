@@ -28,52 +28,72 @@ class CodeController:
         self._coda_analisi.evento.connect(self._al_evento_analisi)
         self._coda_io.evento.connect(self._al_evento_io)
         
-        # Mappa nomi file a task_id
         self._mappa_task = {}
+
+    def _trova_o_crea_task(self, tipo: TaskType, nome: str, info: dict, chiave_mappa: str) -> str:
+        # Se c'è già un task con questo ID nella mappa, lo riutilizziamo azzerandolo
+        task_id = self._mappa_task.get(chiave_mappa)
+        if task_id:
+            task = self.task_manager.get_task(task_id)
+            if task:
+                task.state = TaskState.PENDING
+                task.progress_macro = 0.0
+                task.processed_bytes = 0
+                self.task_manager.signals.task_updated.emit(task_id)
+                return task_id
+                
+        # Creiamo un nuovo task
+        task = TaskInfo(tipo, nome, info)
+        task_id = self.task_manager.add_task(task)
+        self._mappa_task[chiave_mappa] = task_id
+        return task_id
 
     def _al_evento_analisi(self, ev: EventoCoda) -> None:
         nome = ev.info_file.get("nome", "Sconosciuto")
-        task_id = self._mappa_task.get(f"analisi_{nome}")
+        chiave = f"analisi_{nome}"
         
         if ev.azione == "aggiunto":
-            task = TaskInfo(TaskType.NETWORK_API, nome, ev.info_file)
-            task_id = self.task_manager.add_task(task)
-            self._mappa_task[f"analisi_{nome}"] = task_id
-        elif ev.azione == "inizio" and task_id:
-            self.task_manager.update_task_state(task_id, TaskState.RUNNING)
-        elif ev.azione == "fine" and task_id:
-            if ev.risultato and ev.risultato.successo:
-                self.task_manager.update_task_state(task_id, TaskState.COMPLETED)
-                task = self.task_manager.get_task(task_id)
-                task.progress_macro = 100.0
-                self.task_manager.signals.task_updated.emit(task_id)
-            else:
-                self.task_manager.update_task_state(task_id, TaskState.FAILED_RETRYING)
-                task = self.task_manager.get_task(task_id)
-                task.error_message = ev.risultato.errore if ev.risultato else "Errore ignoto"
-                self.task_manager.signals.task_updated.emit(task_id)
+            self._trova_o_crea_task(TaskType.NETWORK_API, nome, ev.info_file, chiave)
+        elif ev.azione == "inizio":
+            task_id = self._mappa_task.get(chiave)
+            if task_id:
+                self.task_manager.update_task_state(task_id, TaskState.RUNNING)
+        elif ev.azione == "fine":
+            task_id = self._mappa_task.get(chiave)
+            if task_id:
+                if ev.risultato and ev.risultato.successo:
+                    task = self.task_manager.get_task(task_id)
+                    task.progress_macro = 100.0
+                    self.task_manager.update_task_state(task_id, TaskState.COMPLETED)
+                else:
+                    task = self.task_manager.get_task(task_id)
+                    task.error_message = ev.risultato.errore if ev.risultato else "Errore ignoto"
+                    self.task_manager.update_task_state(task_id, TaskState.FAILED_RETRYING)
+        elif ev.azione == "svuotata":
+            # Potremmo marcare tutti i pending come annullati
+            pass
 
     def _al_evento_io(self, ev: EventoCoda) -> None:
         nome = ev.info_file.get("nome", "Sconosciuto")
-        task_id = self._mappa_task.get(f"io_{nome}")
+        chiave = f"io_{nome}"
         
         if ev.azione == "aggiunto":
-            task = TaskInfo(TaskType.IO_DISK, nome, ev.info_file)
-            task_id = self.task_manager.add_task(task)
-            self._mappa_task[f"io_{nome}"] = task_id
-        elif ev.azione == "inizio" and task_id:
-            self.task_manager.update_task_state(task_id, TaskState.RUNNING)
-        elif ev.azione == "fine" and task_id:
-            if ev.risultato and ev.risultato.successo:
-                self.task_manager.update_task_state(task_id, TaskState.COMPLETED)
-                task = self.task_manager.get_task(task_id)
-                task.progress_macro = 100.0
-                self.task_manager.signals.task_updated.emit(task_id)
-            else:
-                self.task_manager.update_task_state(task_id, TaskState.FAILED_RETRYING)
-                task = self.task_manager.get_task(task_id)
-                task.error_message = ev.risultato.errore if ev.risultato else "Errore ignoto"
-                self.task_manager.signals.task_updated.emit(task_id)
+            self._trova_o_crea_task(TaskType.IO_DISK, nome, ev.info_file, chiave)
+        elif ev.azione == "inizio":
+            task_id = self._mappa_task.get(chiave)
+            if task_id:
+                self.task_manager.update_task_state(task_id, TaskState.RUNNING)
+        elif ev.azione == "fine":
+            task_id = self._mappa_task.get(chiave)
+            if task_id:
+                if ev.risultato and ev.risultato.successo:
+                    task = self.task_manager.get_task(task_id)
+                    task.progress_macro = 100.0
+                    self.task_manager.update_task_state(task_id, TaskState.COMPLETED)
+                else:
+                    task = self.task_manager.get_task(task_id)
+                    task.error_message = ev.risultato.errore if ev.risultato else "Errore ignoto"
+                    self.task_manager.update_task_state(task_id, TaskState.FAILED_RETRYING)
 
 
 class CodeView(PollableScreen):
@@ -88,7 +108,7 @@ class CodeView(PollableScreen):
         main_layout = QVBoxLayout(self)
         main_layout.addWidget(intestazione)
         main_layout.addSpacing(SPAZIATURA.lg)
-        main_layout.addWidget(self.monitor_widget, 1) # Il monitor prende tutto lo spazio rimanente
+        main_layout.addWidget(self.monitor_widget, 1)
         main_layout.setContentsMargins(SPAZIATURA.xxl, SPAZIATURA.xxl, SPAZIATURA.xxl, SPAZIATURA.xxl)
 
     def start_polling(self) -> None:
