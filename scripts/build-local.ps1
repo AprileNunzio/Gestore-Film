@@ -1,8 +1,9 @@
 <#
 .SYNOPSIS
-    Build locale completa: bump patch della versione, build PyInstaller,
-    installer Inno Setup, zip portable. Non tocca git ne' GitHub — per quello
-    vedi build-publish.ps1 (npm run build:publish).
+    Build locale completa: bump patch della versione, build PyInstaller
+    (eseguibile onefile, stesso schema del workflow GitHub Actions in
+    .github/workflows/build.yml) + installer Inno Setup (installer/installer.iss).
+    Non tocca git ne' GitHub — per quello vedi build-publish.ps1 (npm run build:publish).
 
 .PARAMETER Bump
     Parte di versione da incrementare prima della build: patch (default), minor, major.
@@ -24,7 +25,7 @@ Write-Output "==> Bump versione ($Bump)"
 $versione = & "$PSScriptRoot\bump-version.ps1" -Parte $Bump | Select-Object -Last 1
 
 Write-Output "==> Build PyInstaller (versione $versione)"
-& $venvPython -m PyInstaller --distpath "$radiceProgetto\build\dist" --workpath "$radiceProgetto\build\work" --noconfirm "$radiceProgetto\build\gestore_film.spec"
+& $venvPython -m PyInstaller --distpath "$radiceProgetto\dist" --workpath "$radiceProgetto\build" --noconfirm "$radiceProgetto\Gestore_Film_Portable.spec"
 if ($LASTEXITCODE -ne 0) { throw "Build PyInstaller fallita" }
 
 Write-Output "==> Compilazione installer (Inno Setup)"
@@ -35,15 +36,11 @@ if (-not (Test-Path $iscc)) {
 if (-not (Test-Path $iscc)) {
     throw "ISCC.exe (Inno Setup 6) non trovato. Installalo con: winget install JRSoftware.InnoSetup"
 }
-New-Item -ItemType Directory -Force -Path "$radiceProgetto\build\installer_output" | Out-Null
-& $iscc "/DMyAppVersion=$versione" "$radiceProgetto\build\installer.iss"
+New-Item -ItemType Directory -Force -Path "$radiceProgetto\installer_output" | Out-Null
+& $iscc "/DMyAppVersion=$versione" "$radiceProgetto\installer\installer.iss"
 if ($LASTEXITCODE -ne 0) { throw "Compilazione installer fallita" }
-
-Write-Output "==> Creazione zip portable"
-$zipPath = "$radiceProgetto\build\installer_output\GestoreFilmPortable-Portable-$versione.zip"
-if (Test-Path $zipPath) { Remove-Item $zipPath -Force }
-Compress-Archive -Path "$radiceProgetto\build\dist\GestoreFilmPortable\*" -DestinationPath $zipPath -CompressionLevel Optimal
 
 Write-Output ""
 Write-Output "==> Fatto. Versione ${versione}:"
-Get-ChildItem "$radiceProgetto\build\installer_output" | Select-Object Name, @{N = "SizeMB"; E = { [math]::Round($_.Length / 1MB, 1) } }
+Get-ChildItem "$radiceProgetto\dist" | Select-Object Name, @{N = "SizeMB"; E = { [math]::Round($_.Length / 1MB, 1) } }
+Get-ChildItem "$radiceProgetto\installer_output" | Select-Object Name, @{N = "SizeMB"; E = { [math]::Round($_.Length / 1MB, 1) } }

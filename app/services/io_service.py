@@ -332,3 +332,39 @@ def imposta_data_file(percorso: str, data_iso: str) -> None:
 
     except Exception as e:
         _log.warning(f"Errore non fatale durante l'impostazione data su {percorso}: {e}")
+
+def imposta_data_attuale(percorso: str) -> None:
+    """Imposta data modifica/accesso/creazione (Windows) di un file o directory al momento attuale."""
+    try:
+        timestamp = time.time()
+        os.utime(percorso, (timestamp, timestamp))
+
+        if os.name == "nt":
+            epoch_diff = 116444736000000000
+            file_time = int((timestamp * 10000000) + epoch_diff)
+            creation_time = wintypes.FILETIME(file_time & 0xFFFFFFFF, file_time >> 32)
+
+            file_flag_backup_semantics = 0x02000000
+            file_share_read = 1
+            file_share_write = 2
+            open_existing = 3
+            file_write_attributes = 0x0100
+
+            handle = ctypes.windll.kernel32.CreateFileW(
+                percorso,
+                file_write_attributes,
+                file_share_read | file_share_write,
+                None,
+                open_existing,
+                file_flag_backup_semantics,
+                None,
+            )
+
+            if handle not in (None, -1):
+                ctypes.windll.kernel32.SetFileTime(handle, ctypes.byref(creation_time), None, ctypes.byref(creation_time))
+                ctypes.windll.kernel32.CloseHandle(handle)
+                _log.info(f"Data di creazione (ATTUALE) applicata a: {percorso}")
+            else:
+                _log.warning(f"Impossibile ottenere l'handle per applicare la data a: {percorso}")
+    except Exception as e:
+        _log.warning(f"Errore non fatale durante l'impostazione data attuale su {percorso}: {e}")

@@ -25,6 +25,10 @@ def configura(api_key: str) -> None:
     _client = None  # ricreato pigramente al prossimo uso
 
 
+def chiave_configurata() -> bool:
+    return bool(_api_key)
+
+
 def _ottieni_client() -> Any:
     global _client
     if _client is None and _api_key:

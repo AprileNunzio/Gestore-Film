@@ -21,6 +21,10 @@ def configura(api_key: str) -> None:
     _api_key = api_key
 
 
+def chiave_configurata() -> bool:
+    return bool(_api_key)
+
+
 _PROMPT_FILM = """Sei un esperto cinematografico e di serie TV. Analizza il seguente nome file e identifica di quale opera si tratta.
 
 Nome file: "{nome_file}"

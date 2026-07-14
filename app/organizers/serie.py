@@ -14,7 +14,8 @@ import re
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from app.core.config import ESTENSIONI_VIDEO
+from app.core.config import ESTENSIONI_VIDEO, ConfigManager
+from app.core.paths import AppPaths
 from app.services import ffmpeg_service, io_service, media_parsing, tmdb_service
 
 _log = logging.getLogger("gestore_film.principale")
@@ -84,9 +85,33 @@ class OrganizzatoreSerie:
         anno_da_usare = dati_ai.get("anno") if dati_ai else (info_file.get("anno_guessit") or anno_pulito)
         confidenza_ai = dati_ai.get("confidenza", 0.0) if dati_ai else 0.0
 
-        varianti = tmdb_service.cerca_serie(titolo_da_usare, anno_da_usare, nome_file=nome)
-
+        # 1. Analisi tecnica locale (ffprobe)
         info_tecnica = ffmpeg_service.analizza_tecnico(percorso)
+
+        # 2. Controllo Risoluzione Minima
+        config = ConfigManager(AppPaths()).carica().get("automazione", {})
+        if config.get("risoluzione_minima_attiva", False):
+            soglia_valore = config.get("risoluzione_minima_valore", "720p")
+            rank = {"SD": 0, "480p": 1, "720p": 2, "1080p": 3, "1440p": 4, "2160p": 5}
+            res_corrente = info_tecnica.get("risoluzione") or "SD"
+            if rank.get(res_corrente, 0) < rank.get(soglia_valore, 0):
+                self._log(f"  Scartato: Risoluzione {res_corrente} inferiore alla soglia {soglia_valore}.")
+                return {
+                    "file_originale": nome,
+                    "percorso_originale": percorso,
+                    "estensione": info_file["estensione"],
+                    "stagione": stagione,
+                    "episodio": episodio,
+                    "nome_episodio": "",
+                    "match_principale": {"titolo": titolo_da_usare, "anno": anno_da_usare, "confidenza_tmdb": 0.0},
+                    "gemini": dati_ai or {"tipo": "serie", "confidenza": 0.0, "note": f"Scartato per risoluzione (< {soglia_valore})"},
+                    "varianti": [],
+                    "info_tecnica": info_tecnica,
+                    "confidenza": 0.0,
+                }
+
+        # 3. Ricerca TMDB
+        varianti = tmdb_service.cerca_serie(titolo_da_usare, anno_da_usare, nome_file=nome)
 
         match_principale = (
             varianti[0] if varianti else {"titolo": titolo_da_usare, "anno": anno_da_usare, "confidenza": confidenza_ai}
@@ -144,8 +169,7 @@ class OrganizzatoreSerie:
             "confidenza": confidenza_complessiva,
         }
 
-        if match_principale and match_principale.get("data_rilascio"):
-            io_service.imposta_data_file(percorso, match_principale.get("data_rilascio"))
+        io_service.imposta_data_attuale(percorso)
 
         return res
 
@@ -211,12 +235,10 @@ class OrganizzatoreSerie:
                         io_service.rimuovi_directory_vuote_ricorsivo(os.path.dirname(percorso_sorgente), radice_stop)
 
             if esito:
-                data_rilascio = match.get("data_rilascio")
-                if data_rilascio:
-                    io_service.imposta_data_file(percorso_destinazione, data_rilascio)
-                    io_service.imposta_data_file(cartella_dest, data_rilascio)
-                    cartella_base_serie = os.path.dirname(cartella_dest)
-                    io_service.imposta_data_file(cartella_base_serie, data_rilascio)
+                io_service.imposta_data_attuale(percorso_destinazione)
+                io_service.imposta_data_attuale(cartella_dest)
+                cartella_base_serie = os.path.dirname(cartella_dest)
+                io_service.imposta_data_attuale(cartella_base_serie)
 
             return {"successo": esito, "percorso_finale": percorso_destinazione if esito else None, "errore": msg_io if not esito else None}
         except OSError as e:

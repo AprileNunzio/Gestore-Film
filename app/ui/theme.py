@@ -1,180 +1,82 @@
-"""Sistema di tema light/dark: palette, rilevamento del tema di sistema
-Windows, generazione del foglio di stile QSS.
+"""Sistema di tema: palette scura vivace, generazione del foglio di stile QSS.
 
-Sostituisce l'unico resources/style.qss statico della prima milestone con una
-generazione dinamica a partire da un'unica fonte di verità (ThemeColors), così
-light e dark restano sempre coerenti senza dover mantenere due QSS a mano, e
-un widget può recuperare a runtime i colori del tema attivo (vedi
-`colori_correnti()`) per gli accenti costruiti in codice (badge, pulsanti di
-stato) invece di avere colori hex sparsi e non coordinati nei singoli screen.
+Tema scuro con accenti colorati e saturi (vedi `design_tokens.CATEGORIA` per
+i colori per categoria/schermata) — sostituisce il precedente tema chiaro ad
+alto contrasto su richiesta esplicita di un look più moderno e colorato.
+
+I valori di colore/spaziatura/tipografia non sono più definiti qui: vengono da
+`app/ui/design_tokens.py`, unica fonte di verità condivisa anche dai
+componenti in `app/ui/components/`. Questo modulo resta responsabile solo
+della generazione del QSS globale e della sincronizzazione con il tema di
+qfluentwidgets (vedi `applica_tema`).
 """
 from __future__ import annotations
 
-import sys
-from dataclasses import dataclass
-from typing import Literal
-
 from PyQt6.QtCore import QObject, pyqtSignal
+from qfluentwidgets import Theme, setTheme, setThemeColor
 
-Modalita = Literal["light", "dark"]
+from app.ui.design_tokens import PALETTE_SCURA, RAGGIO, SPAZIATURA, TIPOGRAFIA, Palette as ThemeColors, stile_qss
 
+DARK = PALETTE_SCURA
 
-@dataclass(frozen=True)
-class ThemeColors:
-    sfondo: str
-    superficie: str
-    superficie_alt: str
-    bordo: str
-    testo: str
-    testo_secondario: str
-    accento: str
-    accento_hover: str
-    accento_testo: str
-    successo: str
-    successo_sfondo: str
-    avviso: str
-    avviso_sfondo: str
-    errore: str
-    errore_sfondo: str
-
-
-LIGHT = ThemeColors(
-    sfondo="#E9E9EE",
-    superficie="#FFFFFF",
-    superficie_alt="#F3F3F7",
-    bordo="#DCDCE3",
-    testo="#1A1A1E",
-    testo_secondario="#5C5C66",
-    accento="#5B5BD6",
-    accento_hover="#4A4AC0",
-    accento_testo="#FFFFFF",
-    successo="#107C10",
-    successo_sfondo="#EAF7EA",
-    avviso="#9D5D00",
-    avviso_sfondo="#FFF6E5",
-    errore="#C42B1C",
-    errore_sfondo="#FBEAE9",
-)
-
-DARK = ThemeColors(
-    sfondo="#17171A",
-    superficie="#26262B",
-    superficie_alt="#1F1F23",
-    bordo="#38383F",
-    testo="#F2F2F5",
-    testo_secondario="#B4B4BC",
-    accento="#8B8BEE",
-    accento_hover="#9E9EF1",
-    accento_testo="#0F0F12",
-    successo="#6CCB5F",
-    successo_sfondo="#1D2A1C",
-    avviso="#FFB900",
-    avviso_sfondo="#2E2510",
-    errore="#FF99A4",
-    errore_sfondo="#2E1A1C",
-)
 
 class _ThemeBus(QObject):
-    """Notifica gli screen quando il tema cambia, per rinfrescare i colori inline."""
-
+    """Notifica gli screen quando il tema cambia (attualmente solo init)."""
     cambiato = pyqtSignal(str)
 
 
 bus = _ThemeBus()
 
-_modalita_corrente: Modalita = "light"
+
+def rileva_tema_sistema() -> str:
+    """Ritorna sempre 'dark' per forzare l'app nel tema scuro vivace."""
+    return "dark"
 
 
-def rileva_tema_sistema() -> Modalita:
-    """Legge la preferenza chiaro/scuro di Windows dal registro; 'light' se non rilevabile."""
-    if sys.platform != "win32":
-        return "light"
-    try:
-        import winreg
-
-        chiave = winreg.OpenKey(
-            winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize"
-        )
-        valore, _ = winreg.QueryValueEx(chiave, "AppsUseLightTheme")
-        return "light" if valore else "dark"
-    except OSError:
-        return "light"
-
-
-def colori(modalita: Modalita) -> ThemeColors:
-    return LIGHT if modalita == "light" else DARK
+def colori(modalita: str = "dark") -> ThemeColors:
+    return DARK
 
 
 def colori_correnti() -> ThemeColors:
-    return colori(_modalita_corrente)
+    return DARK
 
 
-def modalita_corrente() -> Modalita:
-    return _modalita_corrente
+def modalita_corrente() -> str:
+    return "dark"
 
 
-def applica_tema(app, modalita: Modalita) -> None:
-    """Applica il tema alla QApplication, lo ricorda per colori_correnti() e notifica bus.cambiato."""
-    global _modalita_corrente
-    _modalita_corrente = modalita
-    app.setStyleSheet(costruisci_stylesheet(colori(modalita)))
-    bus.cambiato.emit(modalita)
+def applica_tema(app, modalita: str = "dark") -> None:
+    """Applica il tema alla QApplication (QSS custom + tema qfluentwidgets) e notifica bus.cambiato."""
+    setTheme(Theme.DARK)
+    setThemeColor(DARK.accento)
+    app.setStyleSheet(costruisci_stylesheet(DARK))
+    bus.cambiato.emit("dark")
 
 
 def costruisci_stylesheet(c: ThemeColors) -> str:
     return f"""
 QWidget {{
-    background-color: {c.sfondo};
     color: {c.testo};
-    font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
-    font-size: 10.5pt;
+    font-family: {TIPOGRAFIA.famiglia};
+    font-size: {TIPOGRAFIA.corpo.dimensione_pt}pt;
 }}
 
-QMainWindow {{
+QMainWindow, QWidget {{
     background-color: {c.sfondo};
 }}
 
-#barraNavigazione {{
-    background-color: {c.superficie};
-    border: none;
-    border-right: 1px solid {c.bordo};
-}}
-
-#listaNavigazione {{
+QLabel, QCheckBox, QRadioButton {{
     background-color: transparent;
-    border: none;
-    outline: 0;
-    padding: 4px 8px;
 }}
 
-#listaNavigazione::item {{
-    padding: 12px 14px;
-    margin: 2px 0;
-    border-radius: 8px;
-    color: {c.testo_secondario};
-}}
-
-#listaNavigazione::item:selected {{
-    background-color: {c.accento};
-    color: {c.accento_testo};
-    font-weight: 600;
-}}
-
-#listaNavigazione::item:disabled {{
-    color: {c.bordo};
-}}
-
-#listaNavigazione::item:hover:!selected {{
-    background-color: {c.superficie_alt};
-}}
-
+/* -- Bottoni -- */
 QPushButton {{
     background-color: {c.accento};
     color: {c.accento_testo};
     border: none;
-    border-radius: 8px;
-    padding: 9px 18px;
-    font-weight: 600;
+    border-radius: {RAGGIO.md}px;
+    padding: 10px 20px;
+    {stile_qss(TIPOGRAFIA.corpo_enfasi)}
 }}
 
 QPushButton:hover {{
@@ -186,114 +88,144 @@ QPushButton:pressed {{
 }}
 
 QPushButton:disabled {{
-    background-color: {c.bordo};
-    color: {c.testo_secondario};
+    background-color: {c.superficie_alt};
+    color: {c.bordo};
 }}
 
 QPushButton#pulsanteSecondario {{
-    background-color: transparent;
-    color: {c.accento};
-    border: 1px solid {c.accento};
+    background-color: {c.superficie};
+    color: {c.testo};
+    border: 1px solid {c.bordo};
 }}
 
 QPushButton#pulsanteSecondario:hover {{
     background-color: {c.superficie_alt};
+    border: 1px solid {c.testo_secondario};
 }}
 
 QPushButton#pulsanteIcona {{
     background-color: transparent;
     color: {c.testo_secondario};
-    border-radius: 8px;
-    padding: 6px;
+    border-radius: {RAGGIO.sm}px;
+    padding: 8px;
 }}
 
 QPushButton#pulsanteIcona:hover {{
     background-color: {c.superficie_alt};
+    color: {c.testo};
 }}
 
+/* -- Input ed Editor -- */
 QLineEdit, QTextEdit, QPlainTextEdit, QComboBox, QSpinBox {{
     background-color: {c.superficie};
     color: {c.testo};
     border: 1px solid {c.bordo};
-    border-radius: 8px;
-    padding: 7px 10px;
+    border-radius: {RAGGIO.md}px;
+    padding: 10px 14px;
     selection-background-color: {c.accento};
     selection-color: {c.accento_testo};
+    font-size: {TIPOGRAFIA.corpo.dimensione_pt}pt;
 }}
 
-QLineEdit:focus, QComboBox:focus, QTextEdit:focus, QPlainTextEdit:focus {{
-    border: 1px solid {c.accento};
+QLineEdit:focus, QComboBox:focus, QTextEdit:focus, QPlainTextEdit:focus, QSpinBox:focus {{
+    border: 2px solid {c.accento};
+    padding: 9px 13px; /* Compensa il bordo di 2px per non far saltare il testo */
 }}
 
+QComboBox::drop-down {{
+    border: none;
+    width: 20px;
+}}
+
+QComboBox::down-arrow {{
+    image: none;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 5px solid {c.testo_secondario};
+    margin-right: 10px;
+}}
+
+/* -- Testi ed Etichette (Gerarchia) -- */
 QLabel#titoloSchermata {{
-    font-size: 20pt;
-    font-weight: 700;
+    {stile_qss(TIPOGRAFIA.titolo)}
     color: {c.testo};
 }}
 
 QLabel#sottotitoloSchermata {{
     color: {c.testo_secondario};
-    font-size: 10.5pt;
+    {stile_qss(TIPOGRAFIA.sottotitolo)}
 }}
 
+QLabel#testoInfo {{
+    color: {c.testo_secondario};
+    font-size: {TIPOGRAFIA.corpo.dimensione_pt}pt;
+}}
+
+/* -- Card di Layout -- */
 QFrame#cartaContenuto {{
     background-color: {c.superficie};
     border: 1px solid {c.bordo};
-    border-radius: 12px;
+    border-radius: {RAGGIO.lg}px;
 }}
 
+/* -- Progress Bar -- */
 QProgressBar {{
     background-color: {c.superficie_alt};
-    border: none;
-    border-radius: 6px;
+    border: 1px solid {c.bordo};
+    border-radius: {RAGGIO.md}px;
     text-align: center;
     color: {c.testo};
-    min-height: 10px;
+    font-weight: 600;
+    min-height: 20px;
 }}
 
 QProgressBar::chunk {{
     background-color: {c.accento};
-    border-radius: 6px;
+    border-radius: {RAGGIO.md}px;
 }}
 
+/* -- Table e List -- */
 QTableView, QListView, QListWidget {{
     background-color: {c.superficie};
-    alternate-background-color: {c.superficie_alt};
+    alternate-background-color: {c.sfondo};
     border: 1px solid {c.bordo};
-    border-radius: 10px;
-    gridline-color: {c.bordo};
+    border-radius: {RAGGIO.lg}px;
+    gridline-color: {c.superficie_alt};
     outline: 0;
 }}
 
 QTableView::item, QListView::item, QListWidget::item {{
-    padding: 6px;
-    border-radius: 6px;
+    padding: 10px;
+    border-bottom: 1px solid {c.superficie_alt};
 }}
 
 QTableView::item:selected, QListView::item:selected, QListWidget::item:selected {{
-    background-color: {c.accento};
-    color: {c.accento_testo};
+    background-color: {c.successo_sfondo};
+    color: {c.testo};
 }}
 
 QHeaderView::section {{
-    background-color: {c.superficie_alt};
+    background-color: {c.sfondo};
     color: {c.testo_secondario};
-    padding: 8px;
+    padding: 12px 10px;
     border: none;
-    border-bottom: 1px solid {c.bordo};
-    font-weight: 600;
+    border-bottom: 2px solid {c.bordo};
+    {stile_qss(TIPOGRAFIA.etichetta_sezione)}
 }}
 
+/* -- Scrollbar spesse e accessibili -- */
 QScrollBar:vertical {{
-    background: transparent;
-    width: 10px;
-    margin: 2px;
+    background: {c.sfondo};
+    width: 14px;
+    margin: 0px;
+    border-left: 1px solid {c.bordo};
 }}
 
 QScrollBar::handle:vertical {{
     background: {c.bordo};
-    border-radius: 5px;
-    min-height: 30px;
+    border-radius: 7px;
+    min-height: 40px;
+    margin: 2px;
 }}
 
 QScrollBar::handle:vertical:hover {{
@@ -305,15 +237,17 @@ QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
 }}
 
 QScrollBar:horizontal {{
-    background: transparent;
-    height: 10px;
-    margin: 2px;
+    background: {c.sfondo};
+    height: 14px;
+    margin: 0px;
+    border-top: 1px solid {c.bordo};
 }}
 
 QScrollBar::handle:horizontal {{
     background: {c.bordo};
-    border-radius: 5px;
-    min-width: 30px;
+    border-radius: 7px;
+    min-width: 40px;
+    margin: 2px;
 }}
 
 QScrollBar::handle:horizontal:hover {{
@@ -324,12 +258,14 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {{
     width: 0;
 }}
 
+/* -- Tooltip e MessageBox -- */
 QToolTip {{
-    background-color: {c.superficie};
-    color: {c.testo};
-    border: 1px solid {c.bordo};
-    padding: 4px 8px;
-    border-radius: 6px;
+    background-color: {c.testo};
+    color: {c.superficie};
+    border: none;
+    padding: 6px 10px;
+    border-radius: 4px;
+    font-weight: 500;
 }}
 
 QMessageBox {{

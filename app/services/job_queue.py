@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import traceback
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional
@@ -98,6 +99,7 @@ class CodaLavori(QObject):
         self._pool.setMaxThreadCount(max(1, num_workers))
         self._operazioni_attive = 0
         self._job_in_volo: dict[int, _Job] = {}
+        self._lock = threading.Lock()
 
     @property
     def operazioni_attive(self) -> int:
@@ -111,12 +113,25 @@ class CodaLavori(QObject):
         info_file: Optional[dict] = None,
         **kwargs: Any,
     ) -> None:
+        # Backpressure: se la coda ha troppi elementi e NON siamo nel thread principale, 
+        # mettiamo in pausa il produttore per non inondare la memoria e la UI (max 500 job).
+        import time
+        if threading.current_thread() is not threading.main_thread():
+            while True:
+                with self._lock:
+                    attive = self._operazioni_attive
+                if attive < 500:
+                    break
+                time.sleep(0.05)
+
         info_file = info_file or {}
         job = _Job(self.nome, funzione, args, kwargs, descrizione, info_file)
         job.signals.finito.connect(self._al_completamento)
 
-        self._job_in_volo[id(job)] = job
-        self._operazioni_attive += 1
+        with self._lock:
+            self._job_in_volo[id(job)] = job
+            self._operazioni_attive += 1
+            attive_ora = self._operazioni_attive
 
         self.evento.emit(
             EventoCoda(
@@ -124,7 +139,7 @@ class CodaLavori(QObject):
                 coda_nome=self.nome,
                 descrizione=descrizione,
                 info_file=info_file,
-                coda_lunghezza=self._operazioni_attive,
+                coda_lunghezza=attive_ora,
             )
         )
         self.evento.emit(
@@ -133,8 +148,10 @@ class CodaLavori(QObject):
         self._pool.start(job)
 
     def _al_completamento(self, esito: _JobEsito, risultato: RisultatoJob) -> None:
-        self._job_in_volo.pop(esito.job_id, None)
-        self._operazioni_attive = max(0, self._operazioni_attive - 1)
+        with self._lock:
+            self._job_in_volo.pop(esito.job_id, None)
+            self._operazioni_attive = max(0, self._operazioni_attive - 1)
+            attive_ora = self._operazioni_attive
         self.evento.emit(
             EventoCoda(
                 azione="fine",
@@ -142,15 +159,16 @@ class CodaLavori(QObject):
                 descrizione=esito.descrizione,
                 info_file=esito.info_file,
                 risultato=risultato,
-                coda_lunghezza=self._operazioni_attive,
+                coda_lunghezza=attive_ora,
             )
         )
 
     def svuota(self) -> None:
         """Rimuove i job non ancora avviati; quelli già in esecuzione completano comunque."""
         self._pool.clear()
-        self._job_in_volo.clear()
-        self._operazioni_attive = 0
+        with self._lock:
+            self._job_in_volo.clear()
+            self._operazioni_attive = 0
         self.evento.emit(EventoCoda(azione="svuotata", coda_nome=self.nome, coda_lunghezza=0))
 
     def attendi_completamento(self, timeout_ms: int = -1) -> bool:
@@ -162,6 +180,6 @@ _cpu_count = max(4, os.cpu_count() or 4)
 
 def crea_code(parent: Optional[QObject] = None) -> tuple[CodaLavori, CodaLavori]:
     """Crea le due code standard dell'app: analisi (network/CPU bound) e IO (limitata)."""
-    coda_analisi = CodaLavori("Analisi", num_workers=_cpu_count * 2, parent=parent)
-    coda_io = CodaLavori("IO", num_workers=min(4, _cpu_count), parent=parent)
+    coda_analisi = CodaLavori("Analisi", num_workers=1, parent=parent)
+    coda_io = CodaLavori("IO", num_workers=1, parent=parent)
     return coda_analisi, coda_io

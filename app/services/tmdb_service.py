@@ -105,6 +105,7 @@ def _recupera_dettagli(tmdb_id: int) -> dict[str, Any]:
         return {
             "sinossi": d.get("overview", ""),
             "genere": generi,
+            "voto_medio": d.get("vote_average", 0.0),
             "poster_path": d.get("poster_path", ""),
             "titolo_it_tmdb": d.get("title", ""),
             "data_rilascio": d.get("release_date", ""),
@@ -121,6 +122,7 @@ def _recupera_dettagli_tv(tmdb_id: int) -> dict[str, Any]:
         return {
             "sinossi": d.get("overview", ""),
             "genere": generi,
+            "voto_medio": d.get("vote_average", 0.0),
             "poster_path": d.get("poster_path", ""),
             "titolo_it_tmdb": d.get("name", ""),
             "tipo": "serie",
@@ -260,7 +262,8 @@ def _genera_strategie(
 
         tags_re = (
             r"\d{3,4}p|[hx]\.?\d{3}|HEVC|AVC|AC3|DTS|AAC|BluRay|WEB.?DL|BDRip|DVDRip|HDTV|UHD|"
-            r"4K|Remux|DVD|DIVX|XVID|PC|Ita|Eng|Sub|Multi|duplicato|copia|backup|sample"
+            r"4K|Remux|DVD|DIVX|XVID|PC|Ita|Eng|Sub|Multi|duplicato|copia|backup|sample|"
+            r"walt\s+disn[ae]y"
         )
         pulito = re.sub(tags_re, " ", pulito, flags=re.I)
         pulito = re.sub(r"(19|20)\d{2}", " ", pulito)

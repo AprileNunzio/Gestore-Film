@@ -4,7 +4,8 @@ __pycache__/
 *.pyc
 *.pyo
 
-# Dati generati a runtime (mai versionati: portable per definizione)
+# Dati generati a runtime (vivono in %APPDATA%, vedi app/core/paths.py;
+# queste righe coprono solo il fallback usato in sviluppo se APPDATA manca)
 settings.json
 dati_recenti.json
 cache_elite.db
@@ -13,10 +14,10 @@ logs/
 error_log.txt
 .env
 
-# Build
-build/dist/
-build/work/
-build/installer_output/
+# Build (PyInstaller onefile: vedi Gestore_Film_Portable.spec; installer: vedi installer/installer.iss)
+build/
+dist/
+installer_output/
 *.spec.bak
 
 # Binari vendored troppo grandi per git (~100MB l'uno): vedi README per come ottenerli

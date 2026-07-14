@@ -13,7 +13,8 @@ import os
 from pathlib import Path
 from typing import Any, Callable, Optional
 
-from app.core.config import ESTENSIONI_VIDEO
+from app.core.config import ESTENSIONI_VIDEO, ConfigManager
+from app.core.paths import AppPaths
 from app.services import ffmpeg_service, gemini_service, io_service, media_parsing, metadata_service, openai_service, tmdb_service
 
 _log = logging.getLogger("gestore_film.principale")
@@ -71,6 +72,31 @@ class OrganizzatoreFilm:
             self._log(f"  Nome file generico, eredito titolo da cartella: {cartella_padre}")
             titolo_loc = cartella_padre
 
+        # 1. Analisi tecnica locale (ffprobe)
+        info_tecnica = ffmpeg_service.analizza_tecnico(percorso)
+
+        # 2. Controllo Risoluzione Minima
+        config = ConfigManager(AppPaths()).carica().get("automazione", {})
+        if config.get("risoluzione_minima_attiva", False):
+            soglia_valore = config.get("risoluzione_minima_valore", "720p")
+            rank = {"SD": 0, "480p": 1, "720p": 2, "1080p": 3, "1440p": 4, "2160p": 5}
+            res_corrente = info_tecnica.get("risoluzione") or "SD"
+            if rank.get(res_corrente, 0) < rank.get(soglia_valore, 0):
+                self._log(f"  Scartato: Risoluzione {res_corrente} inferiore alla soglia {soglia_valore}.")
+                res = {
+                    "file_originale": nome,
+                    "percorso_originale": percorso,
+                    "estensione": info_file["estensione"],
+                    "gemini": {"tipo": "sconosciuto", "confidenza": 0.0, "note": f"Scartato per risoluzione (< {soglia_valore})"},
+                    "match_principale": {"tmdb_id": None, "titolo": titolo_loc, "titolo_originale": "", "anno": anno_loc, "confidenza_tmdb": 0.0},
+                    "varianti": [],
+                    "info_tecnica": info_tecnica,
+                    "confidenza": 0.0,
+                    "nome_jellyfin": {"decade": "Altro", "cartella": titolo_loc, "nome_file": nome}
+                }
+                return res
+
+        # 3. Ricerca TMDB
         varianti = tmdb_service.cerca_film(titolo_loc, anno_loc, nome_file=nome, titolo_secondario=titolo_sec)
         match_principale = varianti[0] if varianti else None
         conf_tmdb = match_principale.get("confidenza_tmdb", 0.0) if match_principale else 0.0
@@ -82,8 +108,6 @@ class OrganizzatoreFilm:
                 varianti = varianti_padre
                 match_principale = varianti[0]
                 conf_tmdb = match_principale.get("confidenza_tmdb", 0.0)
-
-        info_tecnica = ffmpeg_service.analizza_tecnico(percorso)
 
         t_it = match_principale.get("titolo", "") if match_principale else titolo_loc
         t_orig = match_principale.get("titolo_originale", "") if match_principale else titolo_loc
@@ -105,8 +129,7 @@ class OrganizzatoreFilm:
         }
         res["nome_jellyfin"] = self.costruisci_nome_jellyfin(t_it, res["match_principale"], info_tecnica, info_file["estensione"])
 
-        if match_principale and match_principale.get("data_rilascio"):
-            io_service.imposta_data_file(percorso, match_principale.get("data_rilascio"))
+        io_service.imposta_data_attuale(percorso)
 
         return res
 
@@ -135,8 +158,7 @@ class OrganizzatoreFilm:
             t_it = r["match_principale"].get("titolo", "") or titolo_ai
             r["nome_jellyfin"] = self.costruisci_nome_jellyfin(t_it, r["match_principale"], r["info_tecnica"], r["estensione"])
 
-            if r["match_principale"].get("data_rilascio"):
-                io_service.imposta_data_file(r["percorso_originale"], r["match_principale"].get("data_rilascio"))
+            io_service.imposta_data_attuale(r["percorso_originale"])
 
         return r
 
@@ -201,10 +223,8 @@ class OrganizzatoreFilm:
                         io_service.rimuovi_directory_vuote_ricorsivo(os.path.dirname(percorso_sorgente), radice_stop)
 
             if esito:
-                data_rilascio = match.get("data_rilascio")
-                if data_rilascio:
-                    io_service.imposta_data_file(percorso_dest, data_rilascio)
-                    io_service.imposta_data_file(cartella_dest, data_rilascio)
+                io_service.imposta_data_attuale(percorso_dest)
+                io_service.imposta_data_attuale(cartella_dest)
 
                 tmdb_id = match.get("tmdb_id")
                 if tmdb_id:

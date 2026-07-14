@@ -202,6 +202,10 @@ class OrganizzatoreMusica:
                     if rimuovi_vuote:
                         io_service.rimuovi_directory_vuote_ricorsivo(os.path.dirname(percorso_sorgente), radice_stop)
 
+            if esito:
+                io_service.imposta_data_attuale(percorso_destinazione)
+                io_service.imposta_data_attuale(cartella_dest)
+
             return {"successo": esito, "percorso_finale": percorso_destinazione if esito else None, "errore": msg_io if not esito else None}
         except OSError as e:
             self._log(f"Errore spostamento: {e}")

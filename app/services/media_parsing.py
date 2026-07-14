@@ -34,7 +34,21 @@ def normalizza_nome_windows(nome_file: str) -> str:
         " ",
         base,
     )
+    # Rumore di marchio/distributore: non fa parte del titolo reale ma spesso
+    # precede il titolo vero nei file di questa libreria (es. "Walt Disney La
+    # Gnomo Mobile", "Walt Disnay Darby O'Gill...") e degrada sia il parsing
+    # guessit sia la ricerca TMDB se lasciato nella query.
+    base = re.sub(r"(?i)\bwalt\s+disn[ae]y\b", " ", base)
+    
+    # Pulizia custom dai log
+    base = re.sub(r"(?i)_PC\b", " ", base)
+    base = re.sub(r"(?i)[\[\(]?divx[-\s]?ita[\]\)]?", " ", base)
+    base = re.sub(r"(?i)film completo.*", " ", base)
+    base = re.sub(r"(?i)\(\s*\d{3,4}\s*[xX]\s*\d{3,4}\s*\)", " ", base)
+    
     base = re.sub(r"[\.\_\-]", " ", base)
+    # Doppi spazi generati
+    base = re.sub(r"\s{2,}", " ", base)
     return f"{base.strip()}{est}"
 
 
@@ -47,6 +61,7 @@ class StagioneEpisodio(NamedTuple):
 # Pattern in ordine di priorità/affidabilità: i primi (indici 0-2) sono i più
 # specifici ("forte"), 3-4 "media", 5 (catch-all numero nudo) "debole".
 _PATTERNS_STAGIONE_EPISODIO = [
+    re.compile(r"(\d{1,2})[°\s]+(?:serie|stagione|st)[^\d]*?(?:ep\.?|episodio)\s*(\d{1,3})", re.I),
     re.compile(r"(?<!\d)[Ss](\d{1,2})[Ee](\d{1,4})(?!\d)", re.I),
     re.compile(r"(?<!\d)(\d{1,2})[xX](\d{1,4})(?!\d)", re.I),
     re.compile(r"\[(\d{1,2})[xX](\d{1,4})\]", re.I),
@@ -122,6 +137,21 @@ class MotoreIbrido:
 
         risorsa = guessit.guessit(nome_pulito)
         _log.debug(f"Guessit ha restituito: {risorsa}")
+
+        titolo = risorsa.get("title", "")
+        if titolo and titolo.strip().isdigit():
+            # Guessit ha scambiato un numero di catalogo (tipico delle raccolte
+            # con prefisso "NNN AAAA - ITA - Titolo vero") per il titolo: un
+            # titolo di film puramente numerico non è mai corretto in questa
+            # libreria, quindi si ritenta rimuovendo quel token e si tiene il
+            # nuovo risultato solo se stavolta produce un titolo non numerico.
+            token = titolo.strip()
+            nome_senza_numero = re.sub(rf"(?<!\d){re.escape(token)}(?!\d)", " ", nome_pulito, count=1)
+            risorsa_retry = guessit.guessit(nome_senza_numero)
+            titolo_retry = str(risorsa_retry.get("title", "")).strip()
+            if titolo_retry and not titolo_retry.isdigit():
+                _log.debug(f"Titolo numerico '{token}' scartato, ritentato: '{titolo_retry}'")
+                risorsa = risorsa_retry
 
         tipo_indovinato = risorsa.get("type")
         titolo = risorsa.get("title", "")

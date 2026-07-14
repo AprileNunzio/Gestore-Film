@@ -9,7 +9,10 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt6.QtCore import pyqtSignal
-from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QLineEdit, QPushButton, QWidget
+from PyQt6.QtWidgets import QFileDialog, QHBoxLayout, QWidget
+from qfluentwidgets import FluentIcon, LineEdit, PushButton
+
+from app.ui.design_tokens import SPAZIATURA
 
 
 class SelettoreCartella(QWidget):
@@ -17,12 +20,13 @@ class SelettoreCartella(QWidget):
 
     def __init__(self, etichetta_pulsante: str = "Sfoglia...", parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
-        self._campo = QLineEdit()
-        self._pulsante = QPushButton(etichetta_pulsante)
+        self._campo = LineEdit(self)
+        self._pulsante = PushButton(FluentIcon.FOLDER, etichetta_pulsante, self)
         self._pulsante.clicked.connect(self._scegli)
 
         layout = QHBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(SPAZIATURA.xs)
         layout.addWidget(self._campo, stretch=1)
         layout.addWidget(self._pulsante)
 

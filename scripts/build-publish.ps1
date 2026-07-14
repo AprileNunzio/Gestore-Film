@@ -1,8 +1,15 @@
 <#
 .SYNOPSIS
     Build completa + pubblicazione: bump versione, build locale (PyInstaller
-    + installer + zip), commit del bump, tag, push, e release GitHub con gli
-    artefatti allegati. Richiede una working tree pulita e `gh` autenticato.
+    onefile + installer Inno Setup), commit del bump, tag, push, e release
+    GitHub con entrambi gli artefatti allegati. Richiede una working tree
+    pulita e `gh` autenticato.
+
+    Nota: il push del tag v$versione fa scattare anche
+    .github/workflows/build.yml, che ricompila l'eseguibile onefile in CI e lo
+    allega alla stessa release alla pubblicazione (l'installer resta solo
+    locale, CI non ha Inno Setup) — i due eseguibili onefile (locale e CI)
+    sono equivalenti, questo script pubblica quello locale senza attendere CI.
 
 .PARAMETER Bump
     Parte di versione da incrementare: patch (default), minor, major.
@@ -38,9 +45,9 @@ git push origin main
 git push origin "v$versione"
 
 Write-Output "==> Creazione release GitHub v$versione"
-$setupExe = "$radiceProgetto\build\installer_output\GestoreFilmPortable-Setup-$versione.exe"
-$portableZip = "$radiceProgetto\build\installer_output\GestoreFilmPortable-Portable-$versione.zip"
-gh release create "v$versione" "$setupExe" "$portableZip" --title "v$versione" --generate-notes
+$exePath = "$radiceProgetto\dist\Gestore_Film_Portable.exe"
+$setupExe = "$radiceProgetto\installer_output\GestoreFilmPortable-Setup-$versione.exe"
+gh release create "v$versione" "$exePath" "$setupExe" --title "v$versione" --generate-notes
 if ($LASTEXITCODE -ne 0) { throw "Creazione release GitHub fallita" }
 
 Write-Output ""

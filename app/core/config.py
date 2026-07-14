@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from typing import Any
 
 from app.core.paths import AppPaths
@@ -36,8 +37,18 @@ _AUTOMAZIONE_DEFAULT = {
     "pulisci_vuote": False,
     "conflitto": "Salta",
     "genera_trickplay_automaticamente": False,
+    "risoluzione_minima_attiva": False,
+    "risoluzione_minima_valore": "720p",
 }
 _APPROVAZIONE_MANUALE_DEFAULT = {"azione": "Sposta", "pulisci_vuote": False, "conflitto": "Salta"}
+_API_KEYS_DEFAULT = {
+    "tmdb": "",
+    "gemini": "",
+    "openai": "",
+    "acoustid": "",
+    "lingua_default": "it",
+    "tmdb_lingua": "it-IT",
+}
 
 
 def normalizza_percorso(base: str, *parti: str) -> str:
@@ -64,6 +75,7 @@ class ConfigManager:
             "destinazioni": dict(_DESTINAZIONI_DEFAULT),
             "automazione": dict(_AUTOMAZIONE_DEFAULT),
             "approvazione_manuale": dict(_APPROVAZIONE_MANUALE_DEFAULT),
+            "api_keys": dict(_API_KEYS_DEFAULT),
         }
         try:
             if self._paths.settings_file.exists():
@@ -88,11 +100,16 @@ class ConfigManager:
         return bool(dest.get("film") and dest.get("serie") and dest.get("musica"))
 
     def dimensione_cache_mb(self) -> float:
-        totale = 0.0
-        for percorso in (self._paths.cache_db_file, self._paths.registry_db_file):
-            if percorso.exists():
-                totale += percorso.stat().st_size / (1024 * 1024)
-        return round(totale, 2)
+        return self._dimensione_file_mb(self._paths.cache_db_file)
+
+    def dimensione_database_mb(self) -> float:
+        return self._dimensione_file_mb(self._paths.registry_db_file)
+
+    @staticmethod
+    def _dimensione_file_mb(percorso: Path) -> float:
+        if percorso.exists():
+            return round(percorso.stat().st_size / (1024 * 1024), 2)
+        return 0.0
 
     def dimensione_log_mb(self) -> float:
         totale = 0.0
@@ -113,8 +130,14 @@ class ConfigManager:
 
     def svuota_cache(self) -> bool:
         try:
-            for percorso in (self._paths.cache_db_file, self._paths.registry_db_file):
-                percorso.unlink(missing_ok=True)
+            self._paths.cache_db_file.unlink(missing_ok=True)
+            return True
+        except OSError:
+            return False
+
+    def svuota_database(self) -> bool:
+        try:
+            self._paths.registry_db_file.unlink(missing_ok=True)
             return True
         except OSError:
             return False
